@@ -1,0 +1,39 @@
+{
+  "name": "fastify-statistics",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint": "standard | snazzy",
+    "lint:fix": "standard --fix | snazzy",
+    "test": "npm run lint && npm run unit",
+    "unit": "node --test --test-concurrency=1 ./test/**/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leandroandrade/fastify-statistics.git"
+  },
+  "keywords": [
+    "memory",
+    "memory usage"
+  ],
+  "author": {
+    "name": "Leandro Andrade",
+    "email": "leandro.andrade2588@gmail.com",
+    "url": "https://github.com/leandroandrade"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/leandroandrade/fastify-statistics/issues"
+  },
+  "homepage": "https://github.com/leandroandrade/fastify-statistics#readme",
+  "dependencies": {
+    "fastify-plugin": "^5.0.1"
+  },
+  "devDependencies": {
+    "c8": "^10.1.3",
+    "fastify": "^5.4.0",
+    "snazzy": "^9.0.0",
+    "standard": "^17.1.2"
+  }
+}
