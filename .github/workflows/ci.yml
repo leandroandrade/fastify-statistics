@@ -84,6 +84,10 @@ jobs:
         uses: cycjimmy/semantic-release-action@v4
         with:
           semantic_version: 21
+          branches: |
+            [
+              "main"
+            ]
           extra_plugins: |
             @semantic-release/commit-analyzer
             @semantic-release/release-notes-generator
