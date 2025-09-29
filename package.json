@@ -1,6 +1,6 @@
 {
   "name": "fastify-statistics",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A lightweight Fastify plugin that provides system statistics and metrics endpoints for monitoring your Node.js application, including memory usage and event loop utilization metrics.",
   "main": "index.js",
   "scripts": {
