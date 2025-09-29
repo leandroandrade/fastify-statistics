@@ -1,7 +1,7 @@
 {
   "name": "fastify-statistics",
   "version": "0.1.0",
-  "description": "",
+  "description": "A lightweight Fastify plugin that provides system statistics and metrics endpoints for monitoring your Node.js application, including memory usage and event loop utilization metrics.",
   "main": "index.js",
   "scripts": {
     "lint": "standard | snazzy",
@@ -15,14 +15,22 @@
   },
   "keywords": [
     "memory",
-    "memory usage"
+    "memory usage",
+    "elu",
+    "event loop utilization",
+    "event loop",
+    "metrics",
+    "fastify metrics",
+    "uptime",
+    "stats",
+    "monitoring"
   ],
   "author": {
     "name": "Leandro Andrade",
     "email": "leandro.andrade2588@gmail.com",
     "url": "https://github.com/leandroandrade"
   },
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/leandroandrade/fastify-statistics/issues"
   },

@@ -1,7 +1,9 @@
 const fp = require('fastify-plugin')
+const { performance, monitorEventLoopDelay } = require('node:perf_hooks')
 
 /**
  * Fastify plugin for system metrics and statistics
+ * Requires Node.js 20.0.0+
  * @param {import('fastify').FastifyInstance} fastify - Fastify instance
  * @param {Object} options - Configuration options
  * @param {boolean} [options.metricsInMB=false] - Whether to return memory metrics in MB
@@ -16,10 +18,43 @@ async function fastifyStatistics (fastify, options = {}) {
     ...options
   }
 
+  let eventLoopUtilization = null
+  const hasEventLoopUtilization = typeof performance.eventLoopUtilization === 'function'
+
+  if (hasEventLoopUtilization) {
+    eventLoopUtilization = performance.eventLoopUtilization()
+  }
+
+  const eventLoopDelayHistogram = monitorEventLoopDelay({
+    resolution: 10
+  })
+  eventLoopDelayHistogram.enable()
+
   const formatMB = (bytes) => `${(bytes / 1024 / 1024).toFixed(2)} MB`
 
   const formatMemoryValue = (value) => {
     return config.metricsInMB ? formatMB(value) : value.toString()
+  }
+
+  const sanitizeNumber = (value) => {
+    if (typeof value !== 'number' || Number.isNaN(value) || !Number.isFinite(value)) {
+      return 0
+    }
+    return value
+  }
+
+  const getEventLoopUtilization = () => {
+    if (!hasEventLoopUtilization || !eventLoopUtilization) {
+      return null
+    }
+
+    const current = performance.eventLoopUtilization(eventLoopUtilization)
+    const utilization = sanitizeNumber(current.utilization)
+
+    return {
+      raw: utilization,
+      percentage: `${(utilization * 100).toFixed(2)}%`
+    }
   }
 
   fastify.route({
@@ -51,7 +86,7 @@ async function fastifyStatistics (fastify, options = {}) {
     method: 'GET',
     url: config.metricsRoute,
     schema: {
-      summary: 'Returns memory usage metrics',
+      summary: 'Returns memory usage and event loop metrics',
       tags: ['statistics'],
       response: {
         200: {
@@ -78,6 +113,20 @@ async function fastifyStatistics (fastify, options = {}) {
                 }
               }
             },
+            elu: {
+              type: 'object',
+              properties: {
+                raw: {
+                  type: 'number',
+                  description: 'Event loop utilization as decimal (0-1)'
+                },
+                percentage: {
+                  type: 'string',
+                  description: 'Event loop utilization as percentage string (e.g., "15.23%")'
+                }
+              },
+              required: ['raw', 'percentage']
+            },
             timestamp: {
               type: 'string',
               description: 'Metrics collection timestamp'
@@ -88,6 +137,7 @@ async function fastifyStatistics (fastify, options = {}) {
     },
     handler: async (req, reply) => {
       const memoryUsage = process.memoryUsage()
+      const elu = getEventLoopUtilization()
 
       return {
         memory: {
@@ -96,6 +146,7 @@ async function fastifyStatistics (fastify, options = {}) {
           heapUsed: formatMemoryValue(memoryUsage.heapUsed),
           external: formatMemoryValue(memoryUsage.external)
         },
+        elu,
         timestamp: new Date().toISOString()
       }
     }
@@ -124,6 +175,14 @@ async function fastifyStatistics (fastify, options = {}) {
                 external: { type: 'string' }
               }
             },
+            elu: {
+              type: 'object',
+              properties: {
+                raw: { type: 'number' },
+                percentage: { type: 'string' }
+              },
+              required: ['raw', 'percentage']
+            },
             timestamp: { type: 'string' }
           }
         }
@@ -131,6 +190,7 @@ async function fastifyStatistics (fastify, options = {}) {
     },
     handler: async (req, reply) => {
       const memoryUsage = process.memoryUsage()
+      const elu = getEventLoopUtilization()
 
       return {
         uptime: Math.floor(process.uptime()),
@@ -140,9 +200,15 @@ async function fastifyStatistics (fastify, options = {}) {
           heapUsed: formatMemoryValue(memoryUsage.heapUsed),
           external: formatMemoryValue(memoryUsage.external)
         },
+        elu,
         timestamp: new Date().toISOString()
       }
     }
+  })
+
+  fastify.addHook('onClose', (_fastify, done) => {
+    eventLoopDelayHistogram.disable()
+    done()
   })
 }
 
