@@ -15,7 +15,15 @@
   },
   "keywords": [
     "memory",
-    "memory usage"
+    "memory usage",
+    "elu",
+    "event loop utilization",
+    "event loop",
+    "metrics",
+    "fastify metrics",
+    "uptime",
+    "stats",
+    "monitoring"
   ],
   "author": {
     "name": "Leandro Andrade",
