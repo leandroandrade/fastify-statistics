@@ -1,6 +1,6 @@
 # fastify-statistics
 
-A lightweight Fastify plugin that provides system statistics and metrics endpoints for monitoring your Node.js application.
+A lightweight Fastify plugin that provides system statistics and metrics endpoints for monitoring your Node.js application, including memory usage and event loop utilization metrics.
 
 ## Installation
 
@@ -37,7 +37,7 @@ Returns the application uptime in seconds.
 
 ### GET /metrics
 
-Returns memory usage metrics with timestamp.
+Returns memory usage metrics, event loop utilization, and timestamp.
 
 **Response (default - bytes):**
 ```json
@@ -47,6 +47,10 @@ Returns memory usage metrics with timestamp.
     "heapTotal": "20971520",
     "heapUsed": "18874368",
     "external": "1089024"
+  },
+  "elu": {
+    "raw": 0.05,
+    "percentage": "5.00%"
   },
   "timestamp": "2025-07-25T10:30:00.000Z"
 }
@@ -61,13 +65,17 @@ Returns memory usage metrics with timestamp.
     "heapUsed": "18.00 MB",
     "external": "1.04 MB"
   },
+  "elu": {
+    "raw": 0.05,
+    "percentage": "5.00%"
+  },
   "timestamp": "2025-07-25T10:30:00.000Z"
 }
 ```
 
 ### GET /stats
 
-Returns combined statistics including uptime, memory metrics, and timestamp.
+Returns combined statistics including uptime, memory metrics, event loop utilization, and timestamp.
 
 **Response:**
 ```json
@@ -78,6 +86,10 @@ Returns combined statistics including uptime, memory metrics, and timestamp.
     "heapTotal": "20971520",
     "heapUsed": "18874368",
     "external": "1089024"
+  },
+  "elu": {
+    "raw": 0.05,
+    "percentage": "5.00%"
   },
   "timestamp": "2025-07-25T10:30:00.000Z"
 }
@@ -141,7 +153,9 @@ await fastify.listen({ port: 3000 })
 ```
 
 
-## Memory Metrics Explained
+## Metrics Explained
+
+### Memory Metrics
 
 | Metric      | Description                                                          |
 |-------------|----------------------------------------------------------------------|
@@ -149,6 +163,15 @@ await fastify.listen({ port: 3000 })
 | `heapTotal` | Total V8 heap size allocated                                         |
 | `heapUsed`  | V8 heap memory currently in use                                      |
 | `external`  | Memory used by C++ objects bound to JavaScript objects managed by V8 |
+
+### Event Loop Utilization (ELU)
+
+Event Loop Utilization provides insights into how much time the event loop is spending on synchronous work vs. waiting for I/O operations.
+
+| Field            | Type     | Description                                                      |
+|------------------|----------|------------------------------------------------------------------|
+| `elu.raw`        | `number` | Event loop utilization as a decimal between 0 and 1              |
+| `elu.percentage` | `string` | Event loop utilization formatted as a percentage (e.g., "5.00%") |
 
 ## Error Handling
 

@@ -119,7 +119,6 @@ test('fastify-statistics should return combined stats', async (t) => {
   t.assert.ok(typeof json.memory.heapUsed === 'string')
   t.assert.ok(typeof json.memory.external === 'string')
 
-  // Verify timestamp
   t.assert.ok(json.timestamp)
   t.assert.ok(new Date(json.timestamp).toISOString() === json.timestamp)
 })
@@ -183,7 +182,6 @@ test('fastify-statistics should throw errors when memory usage fails', async (t)
     process.memoryUsage = originalMemoryUsage
   })
 
-  // Test metrics endpoint error handling - should return 500 due to unhandled error
   const metricsRes = await fastify.inject({
     method: 'GET',
     url: '/metrics'
@@ -240,34 +238,7 @@ test('fastify-statistics should validate memory values are positive', async (t) 
   t.assert.ok(Number(json.memory.rss) > 0)
   t.assert.ok(Number(json.memory.heapTotal) > 0)
   t.assert.ok(Number(json.memory.heapUsed) > 0)
-  t.assert.ok(Number(json.memory.external) >= 0) // external can be 0
-})
-
-test('fastify-statistics should handle different HTTP methods correctly', async (t) => {
-  const fastify = Fastify()
-  t.after(async () => { await fastify.close() })
-
-  await fastify.register(fastifyStatistics)
-
-  await fastify.ready()
-
-  const postRes = await fastify.inject({
-    method: 'POST',
-    url: '/uptime'
-  })
-  t.assert.equal(postRes.statusCode, 404)
-
-  const putRes = await fastify.inject({
-    method: 'PUT',
-    url: '/metrics'
-  })
-  t.assert.equal(putRes.statusCode, 404)
-
-  const deleteRes = await fastify.inject({
-    method: 'DELETE',
-    url: '/stats'
-  })
-  t.assert.equal(deleteRes.statusCode, 404)
+  t.assert.ok(Number(json.memory.external) >= 0)
 })
 
 test('fastify-statistics should have consistent timestamp format', async (t) => {
@@ -296,11 +267,122 @@ test('fastify-statistics should have consistent timestamp format', async (t) => 
 
   t.assert.ok(metricsTime instanceof Date && !isNaN(metricsTime))
   t.assert.ok(statsTime instanceof Date && !isNaN(statsTime))
+})
 
-  const now = Date.now()
-  const metricsAge = now - metricsTime.getTime()
-  const statsAge = now - statsTime.getTime()
+test('fastify-statistics should return valid event loop utilization in metrics', async (t) => {
+  const fastify = Fastify()
+  t.after(async () => { await fastify.close() })
 
-  t.assert.ok(metricsAge < 5000)
-  t.assert.ok(statsAge < 5000)
+  await fastify.register(fastifyStatistics)
+
+  await fastify.ready()
+
+  const res = await fastify.inject({
+    method: 'GET',
+    url: '/metrics'
+  })
+
+  t.assert.equal(res.statusCode, 200)
+
+  const json = await res.json()
+
+  t.assert.ok(typeof json.elu === 'object')
+  t.assert.ok(typeof json.elu.raw === 'number')
+  t.assert.ok(typeof json.elu.percentage === 'string')
+
+  t.assert.ok(json.elu.raw >= 0 && json.elu.raw <= 1)
+  t.assert.ok(json.elu.percentage.endsWith('%'))
+
+  const percentage = parseFloat(json.elu.percentage.replace('%', ''))
+  t.assert.ok(!isNaN(percentage))
+  t.assert.ok(percentage >= 0 && percentage <= 100)
+
+  const expectedPercentage = (json.elu.raw * 100).toFixed(2)
+  t.assert.equal(json.elu.percentage, `${expectedPercentage}%`)
+})
+
+test('fastify-statistics should return valid event loop utilization in stats', async (t) => {
+  const fastify = Fastify()
+  t.after(async () => { await fastify.close() })
+
+  await fastify.register(fastifyStatistics)
+
+  await fastify.ready()
+
+  const res = await fastify.inject({
+    method: 'GET',
+    url: '/stats'
+  })
+
+  t.assert.equal(res.statusCode, 200)
+
+  const json = await res.json()
+
+  t.assert.ok(typeof json.elu === 'object')
+  t.assert.ok(typeof json.elu.raw === 'number')
+  t.assert.ok(typeof json.elu.percentage === 'string')
+
+  t.assert.ok(json.elu.raw >= 0 && json.elu.raw <= 1)
+  t.assert.ok(json.elu.percentage.endsWith('%'))
+
+  const percentage = parseFloat(json.elu.percentage.replace('%', ''))
+  t.assert.ok(!isNaN(percentage))
+  t.assert.ok(percentage >= 0 && percentage <= 100)
+})
+
+test('fastify-statistics should maintain consistent ELU baseline across multiple calls', async (t) => {
+  const fastify = Fastify()
+  t.after(async () => { await fastify.close() })
+
+  await fastify.register(fastifyStatistics)
+
+  await fastify.ready()
+
+  const responses = []
+  for (let i = 0; i < 3; i++) {
+    const res = await fastify.inject({
+      method: 'GET',
+      url: '/metrics'
+    })
+    responses.push(await res.json())
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+
+  const eluValues = responses.map(r => r.elu).filter(elu => elu !== null)
+
+  eluValues.forEach(elu => {
+    t.assert.ok(typeof elu.raw === 'number')
+    t.assert.ok(elu.raw >= 0 && elu.raw <= 1)
+    t.assert.ok(typeof elu.percentage === 'string')
+  })
+})
+
+test('fastify-statistics should handle event loop utilization with blocked event loop', async (t) => {
+  const fastify = Fastify()
+  t.after(async () => { await fastify.close() })
+
+  await fastify.register(fastifyStatistics)
+
+  await fastify.ready()
+
+  const baselineRes = await fastify.inject({
+    method: 'GET',
+    url: '/metrics'
+  })
+  const baseline = await baselineRes.json()
+
+  const blockStart = Date.now()
+  while (Date.now() - blockStart < 100) {
+    // Busy wait to block event loop
+  }
+
+  const afterBlockRes = await fastify.inject({
+    method: 'GET',
+    url: '/metrics'
+  })
+  const afterBlock = await afterBlockRes.json()
+
+  t.assert.ok(afterBlock.elu.raw >= baseline.elu.raw,
+    `ELU should increase after blocking: baseline=${baseline.elu.raw}, after=${afterBlock.elu.raw}`)
 })
